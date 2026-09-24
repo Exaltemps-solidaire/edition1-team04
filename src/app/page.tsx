@@ -7,6 +7,14 @@ interface ChallengeItem {
   question: string;
 }
 
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+const DOCUMENT_TYPES = ["application/pdf"];
+const TEXT_EXTENSIONS = [".txt", ".md", ".csv"];
+
+function Spinner({ dark = false }: { dark?: boolean }) {
+  return <span className={`spinner${dark ? " spinner-dark" : ""}`} aria-hidden="true" />;
+}
+
 function downloadTextFile(filename: string, content: string) {
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -30,14 +38,30 @@ function readFileAsBase64(file: File): Promise<string> {
   });
 }
 
+function readFileAsText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
+}
+
+function isPlainTextFile(file: File): boolean {
+  if (file.type.startsWith("text/")) return true;
+  if (file.type !== "") return false;
+  return TEXT_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext));
+}
+
 export default function Home() {
   const [notes, setNotes] = useState("");
   const [report, setReport] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const [transcribing, setTranscribing] = useState(false);
-  const [transcribeError, setTranscribeError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
 
   const [challengeItems, setChallengeItems] = useState<ChallengeItem[] | null>(null);
   const [challenging, setChallenging] = useState(false);
@@ -48,6 +72,10 @@ export default function Home() {
   const MIN_NOTES_LENGTH = 20;
   const remaining = MIN_NOTES_LENGTH - notes.trim().length;
   const canSubmit = remaining <= 0 && !loading;
+
+  function appendNotes(text: string) {
+    setNotes((current) => (current.trim().length > 0 ? `${current}\n\n${text}` : text));
+  }
 
   async function handleGenerate() {
     setLoading(true);
@@ -78,49 +106,80 @@ export default function Home() {
     }
   }
 
-  async function handlePhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
-    setTranscribing(true);
-    setTranscribeError(null);
+  async function handleFile(file: File) {
+    setImporting(true);
+    setImportError(null);
 
     try {
-      const imageBase64 = await readFileAsBase64(file);
+      if (isPlainTextFile(file)) {
+        const text = await readFileAsText(file);
+        appendNotes(text.trim());
+        return;
+      }
+
+      if (!IMAGE_TYPES.includes(file.type) && !DOCUMENT_TYPES.includes(file.type)) {
+        setImportError("Format non supporté. Utilisez une image, un PDF ou un fichier texte.");
+        return;
+      }
+
+      const fileBase64 = await readFileAsBase64(file);
       const response = await fetch("/api/v1/notes/transcribe", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ imageBase64, mimeType: file.type }),
+        body: JSON.stringify({ fileBase64, mimeType: file.type }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        setTranscribeError(data.error ?? "Une erreur est survenue.");
+        setImportError(data.error ?? "Une erreur est survenue.");
         return;
       }
 
-      setNotes((current) => (current.trim().length > 0 ? `${current}\n\n${data.text}` : data.text));
+      appendNotes(data.text);
     } catch {
-      setTranscribeError("Impossible de contacter le serveur. Réessayez.");
+      setImportError("Impossible de contacter le serveur. Réessayez.");
     } finally {
-      setTranscribing(false);
+      setImporting(false);
     }
   }
 
-  async function handleCopyNotes() {
+  function handleFileInputChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file) void handleFile(file);
+  }
+
+  function handleDrop(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDragActive(false);
+    const file = event.dataTransfer.files?.[0];
+    if (file) void handleFile(file);
+  }
+
+  function handleDragOver(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDragActive(true);
+  }
+
+  function handleDragLeave() {
+    setDragActive(false);
+  }
+
+  async function handleCopyReport() {
+    if (!report) return;
     try {
-      await navigator.clipboard.writeText(notes);
-      setCopyFeedback("Notes copiées dans le presse-papiers.");
+      await navigator.clipboard.writeText(report);
+      setCopyFeedback("Rapport copié dans le presse-papiers.");
     } catch {
       setCopyFeedback("Impossible de copier automatiquement : sélectionnez le texte manuellement.");
     }
   }
 
-  function handleDownloadNotes() {
-    const filename = `notes-${new Date().toISOString().slice(0, 10)}.txt`;
-    downloadTextFile(filename, notes);
+  function handleDownloadReport() {
+    if (!report) return;
+    const filename = `rapport-${new Date().toISOString().slice(0, 10)}.txt`;
+    downloadTextFile(filename, report);
   }
 
   async function handleChallenge() {
@@ -155,78 +214,85 @@ export default function Home() {
   return (
     <main>
       <h1>Brouillon de rapport</h1>
-      <p>
-        Collez vos notes de terrain (visites, échanges, observations), ou importez une photo de
-        notes manuscrites. Une première version structurée du rapport sera générée à partir de ce
-        texte, à relire et compléter avant toute transmission.
+      <p className="intro">
+        Collez vos notes de terrain (visites, échanges, observations), ou importez un fichier
+        (photo, PDF, texte). Une première version structurée du rapport sera générée à partir de ce
+        contenu, à relire et compléter avant toute transmission.
       </p>
 
-      <label htmlFor="photo">Importer une photo de notes (optionnel)</label>
-      <div>
-        <input
-          id="photo"
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          onChange={handlePhotoChange}
-          disabled={transcribing}
+      <section className="card">
+        <label htmlFor="notes">Notes de terrain</label>
+        <textarea
+          id="notes"
+          value={notes}
+          onChange={(event) => setNotes(event.target.value)}
+          placeholder="Ex : Visite du 12/03 chez la famille D. L'enfant semble..."
         />
-        {transcribing && <span style={{ marginLeft: "0.75rem" }}>Transcription en cours...</span>}
-      </div>
-      {transcribeError && <div className="error-banner">{transcribeError}</div>}
 
-      <label htmlFor="notes" style={{ marginTop: "1rem", display: "block" }}>
-        Notes de terrain
-      </label>
-      <textarea
-        id="notes"
-        value={notes}
-        onChange={(event) => setNotes(event.target.value)}
-        placeholder="Ex : Visite du 12/03 chez la famille D. L'enfant semble..."
-      />
-
-      <div style={{ marginTop: "0.5rem" }}>
-        <button onClick={handleCopyNotes} disabled={notes.trim().length === 0}>
-          Copier les notes
-        </button>
-        <button
-          onClick={handleDownloadNotes}
-          disabled={notes.trim().length === 0}
-          style={{ marginLeft: "0.5rem" }}
+        <div
+          className={`drop-zone${dragActive ? " drop-zone-active" : ""}`}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
         >
-          Télécharger les notes (.txt)
-        </button>
-        {copyFeedback && (
-          <span style={{ marginLeft: "0.75rem", color: "#5b6270", fontSize: "0.9rem" }}>
-            {copyFeedback}
-          </span>
-        )}
-      </div>
+          <label htmlFor="file-import" className="drop-zone-label">
+            Glissez-déposez un fichier ici, ou{" "}
+            <span className="drop-zone-browse">choisissez-le</span>
+            <br />
+            <span className="field-hint">photo, PDF ou fichier texte (.txt, .md, .csv)</span>
+          </label>
+          <input
+            id="file-import"
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,text/csv,.txt,.md,.csv"
+            onChange={handleFileInputChange}
+            disabled={importing}
+          />
+          {importing && (
+            <span className="status-text">
+              <Spinner dark /> Import en cours...
+            </span>
+          )}
+        </div>
+        {importError && <div className="error-banner">{importError}</div>}
+      </section>
 
-      <div style={{ marginTop: "1rem" }}>
-        <button onClick={handleGenerate} disabled={!canSubmit}>
+      <section className="card">
+        <button type="button" className="button-primary" onClick={handleGenerate} disabled={!canSubmit}>
+          {loading && <Spinner />}
           {loading ? "Génération en cours..." : "Générer une première version"}
         </button>
         {!loading && remaining > 0 && (
-          <span style={{ marginLeft: "0.75rem", color: "#5b6270", fontSize: "0.9rem" }}>
+          <p className="field-hint" style={{ marginTop: "0.6rem", marginBottom: 0, textAlign: "center" }}>
             Encore {remaining} caractère{remaining > 1 ? "s" : ""} pour activer le bouton
-          </span>
+          </p>
         )}
-      </div>
-
-      <p className="disclaimer">
-        Ce brouillon est généré automatiquement et n&apos;engage aucune validation : il doit être
-        relu, corrigé et validé par le professionnel avant tout usage.
-      </p>
-
-      {error && <div className="error-banner">{error}</div>}
+        <p className="disclaimer" style={{ textAlign: "center" }}>
+          Ce brouillon est généré automatiquement et n&apos;engage aucune validation : il doit être
+          relu, corrigé et validé par le professionnel avant tout usage.
+        </p>
+        {error && <div className="error-banner">{error}</div>}
+      </section>
 
       {report && (
-        <section>
-          <h2>Première version</h2>
+        <section className="card">
+          <div className="report-header">
+            <h2>Première version</h2>
+            <div className="button-row">
+              <button type="button" className="button-secondary button-small" onClick={handleCopyReport}>
+                Copier
+              </button>
+              <button type="button" className="button-secondary button-small" onClick={handleDownloadReport}>
+                Télécharger (.txt)
+              </button>
+            </div>
+          </div>
+          {copyFeedback && <p className="status-text">{copyFeedback}</p>}
           <div className="report-output">{report}</div>
 
-          <div style={{ marginTop: "1rem" }}>
-            <button onClick={handleChallenge} disabled={challenging}>
+          <div className="button-row" style={{ marginTop: "1rem" }}>
+            <button type="button" onClick={handleChallenge} disabled={challenging}>
+              {challenging && <Spinner />}
               {challenging ? "Analyse en cours..." : "Vérifier mes ressentis"}
             </button>
           </div>
@@ -238,18 +304,18 @@ export default function Home() {
           )}
 
           {challengeItems && challengeItems.length > 0 && (
-            <section style={{ marginTop: "1rem" }}>
+            <div style={{ marginTop: "1rem" }}>
               <h3>Ressentis à étayer</h3>
-              <ul>
+              <ul className="challenge-list">
                 {challengeItems.map((item, index) => (
-                  <li key={index} style={{ marginBottom: "0.75rem" }}>
+                  <li key={index}>
                     <em>&laquo;&nbsp;{item.passage}&nbsp;&raquo;</em>
                     <br />
                     {item.question}
                   </li>
                 ))}
               </ul>
-            </section>
+            </div>
           )}
         </section>
       )}

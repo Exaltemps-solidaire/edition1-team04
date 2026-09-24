@@ -18,7 +18,7 @@ Réponds UNIQUEMENT avec un tableau JSON (aucun texte autour, aucun bloc markdow
 Si tout est déjà bien étayé, réponds avec un tableau vide [].
 Limite-toi aux 5 passages les plus importants.`;
 
-const TRANSCRIBE_SYSTEM_PROMPT = `Tu transcris fidèlement le texte manuscrit ou dactylographié visible sur une photo de notes de terrain prises par un travailleur social.
+const TRANSCRIBE_SYSTEM_PROMPT = `Tu transcris fidèlement le texte manuscrit ou dactylographié visible sur un document de notes de terrain fourni par un travailleur social (photo de notes manuscrites ou document PDF).
 
 Règles :
 - Retranscris uniquement le texte visible, sans le résumer, le reformuler ou le compléter.
@@ -30,8 +30,21 @@ Règles :
 const SUPPORTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as const;
 export type SupportedImageType = (typeof SUPPORTED_IMAGE_TYPES)[number];
 
+const SUPPORTED_DOCUMENT_TYPES = ["application/pdf"] as const;
+export type SupportedDocumentType = (typeof SUPPORTED_DOCUMENT_TYPES)[number];
+
+export type SupportedFileType = SupportedImageType | SupportedDocumentType;
+
 export function isSupportedImageType(mimeType: string): mimeType is SupportedImageType {
   return (SUPPORTED_IMAGE_TYPES as readonly string[]).includes(mimeType);
+}
+
+export function isSupportedDocumentType(mimeType: string): mimeType is SupportedDocumentType {
+  return (SUPPORTED_DOCUMENT_TYPES as readonly string[]).includes(mimeType);
+}
+
+export function isSupportedFileType(mimeType: string): mimeType is SupportedFileType {
+  return isSupportedImageType(mimeType) || isSupportedDocumentType(mimeType);
 }
 
 export interface GenerateReportResult {
@@ -43,7 +56,7 @@ export interface ChallengeItem {
   question: string;
 }
 
-export interface TranscribeImageResult {
+export interface TranscribeFileResult {
   text: string;
 }
 
@@ -64,14 +77,21 @@ interface AnthropicImageContent {
   source: { type: "base64"; media_type: SupportedImageType; data: string };
 }
 
+interface AnthropicDocumentContent {
+  type: "document";
+  source: { type: "base64"; media_type: SupportedDocumentType; data: string };
+}
+
 interface AnthropicTextContent {
   type: "text";
   text: string;
 }
 
+type AnthropicMessageContent = AnthropicImageContent | AnthropicDocumentContent | AnthropicTextContent;
+
 async function callMessages(
   system: string,
-  content: string | Array<AnthropicImageContent | AnthropicTextContent>,
+  content: string | AnthropicMessageContent[],
   maxTokens: number,
   fetchImpl: typeof fetch
 ): Promise<string> {
@@ -132,15 +152,13 @@ export async function challengeReport(
   const text = await callMessages(
     CHALLENGE_SYSTEM_PROMPT,
     `Notes de terrain :\n\n${notes}\n\n---\n\nBrouillon de rapport :\n\n${report}`,
-    1500,
+    2000,
     fetchImpl
   );
 
-  const jsonText = text
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/, "")
-    .trim();
+  const start = text.indexOf("[");
+  const end = text.lastIndexOf("]");
+  const jsonText = start !== -1 && end !== -1 && end > start ? text.slice(start, end + 1) : text.trim();
 
   let parsed: unknown;
   try {
@@ -162,17 +180,18 @@ export async function challengeReport(
   );
 }
 
-export async function transcribeImage(
-  imageBase64: string,
-  mediaType: SupportedImageType,
+export async function transcribeFile(
+  fileBase64: string,
+  mediaType: SupportedFileType,
   fetchImpl: typeof fetch = fetch
-): Promise<TranscribeImageResult> {
+): Promise<TranscribeFileResult> {
+  const fileBlock: AnthropicImageContent | AnthropicDocumentContent = isSupportedImageType(mediaType)
+    ? { type: "image", source: { type: "base64", media_type: mediaType, data: fileBase64 } }
+    : { type: "document", source: { type: "base64", media_type: mediaType, data: fileBase64 } };
+
   const text = await callMessages(
     TRANSCRIBE_SYSTEM_PROMPT,
-    [
-      { type: "image", source: { type: "base64", media_type: mediaType, data: imageBase64 } },
-      { type: "text", text: "Transcris le texte visible sur cette photo de notes." },
-    ],
+    [fileBlock, { type: "text", text: "Transcris le texte visible sur ce document de notes." }],
     2000,
     fetchImpl
   );

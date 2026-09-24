@@ -5,11 +5,11 @@ vi.mock("@/lib/anthropic", async () => {
   const actual = await vi.importActual<typeof import("@/lib/anthropic")>("@/lib/anthropic");
   return {
     ...actual,
-    transcribeImage: vi.fn(),
+    transcribeFile: vi.fn(),
   };
 });
 
-import { transcribeImage, LlmError } from "@/lib/anthropic";
+import { transcribeFile, LlmError } from "@/lib/anthropic";
 import { POST } from "./route";
 
 function makeRequest(body: unknown) {
@@ -22,38 +22,48 @@ function makeRequest(body: unknown) {
 
 describe("POST /api/v1/notes/transcribe", () => {
   beforeEach(() => {
-    vi.mocked(transcribeImage).mockReset();
+    vi.mocked(transcribeFile).mockReset();
   });
 
-  it("returns 400 when imageBase64 is missing", async () => {
+  it("returns 400 when fileBase64 is missing", async () => {
     const response = await POST(makeRequest({ mimeType: "image/png" }));
     expect(response.status).toBe(400);
   });
 
   it("returns 400 when mimeType is unsupported", async () => {
-    const response = await POST(makeRequest({ imageBase64: "abc", mimeType: "application/pdf" }));
+    const response = await POST(makeRequest({ fileBase64: "abc", mimeType: "text/plain" }));
     expect(response.status).toBe(400);
   });
 
-  it("returns 400 when the image is too large", async () => {
-    const response = await POST(makeRequest({ imageBase64: "a".repeat(8_000_001), mimeType: "image/png" }));
+  it("returns 400 when the file is too large", async () => {
+    const response = await POST(makeRequest({ fileBase64: "a".repeat(8_000_001), mimeType: "image/png" }));
     expect(response.status).toBe(400);
   });
 
-  it("returns 200 with the transcribed text on success", async () => {
-    vi.mocked(transcribeImage).mockResolvedValue({ text: "Texte transcrit." });
+  it("returns 200 with the transcribed text for an image", async () => {
+    vi.mocked(transcribeFile).mockResolvedValue({ text: "Texte transcrit." });
 
-    const response = await POST(makeRequest({ imageBase64: "abc", mimeType: "image/png" }));
+    const response = await POST(makeRequest({ fileBase64: "abc", mimeType: "image/png" }));
     const data = await response.json();
 
     expect(response.status).toBe(200);
     expect(data.text).toBe("Texte transcrit.");
   });
 
-  it("returns 502 when the LLM call fails", async () => {
-    vi.mocked(transcribeImage).mockRejectedValue(new LlmError("upstream down", 500));
+  it("returns 200 with the transcribed text for a PDF", async () => {
+    vi.mocked(transcribeFile).mockResolvedValue({ text: "Texte transcrit du PDF." });
 
-    const response = await POST(makeRequest({ imageBase64: "abc", mimeType: "image/png" }));
+    const response = await POST(makeRequest({ fileBase64: "abc", mimeType: "application/pdf" }));
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.text).toBe("Texte transcrit du PDF.");
+  });
+
+  it("returns 502 when the LLM call fails", async () => {
+    vi.mocked(transcribeFile).mockRejectedValue(new LlmError("upstream down", 500));
+
+    const response = await POST(makeRequest({ fileBase64: "abc", mimeType: "image/png" }));
     expect(response.status).toBe(502);
   });
 });

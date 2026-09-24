@@ -49,33 +49,51 @@ describe("Home page", () => {
     await waitFor(() => expect(screen.getByText("Erreur serveur.")).toBeInTheDocument());
   });
 
-  it("copies the notes to the clipboard", async () => {
+  it("does not show copy/download buttons before a report exists", () => {
+    render(<Home />);
+    expect(screen.queryByRole("button", { name: /^copier$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /télécharger/i })).not.toBeInTheDocument();
+  });
+
+  it("copies the report to the clipboard once generated", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ report: "Voici le rapport généré." }),
+    } as Response);
 
     render(<Home />);
     fireEvent.change(screen.getByLabelText(/notes de terrain/i), {
       target: { value: "Des notes suffisamment longues pour activer le bouton." },
     });
-    fireEvent.click(screen.getByRole("button", { name: /copier les notes/i }));
+    fireEvent.click(screen.getByRole("button", { name: /générer/i }));
+    await waitFor(() => expect(screen.getByText("Voici le rapport généré.")).toBeInTheDocument());
 
-    await waitFor(() =>
-      expect(writeText).toHaveBeenCalledWith("Des notes suffisamment longues pour activer le bouton.")
-    );
-    expect(screen.getByText(/copiées dans le presse-papiers/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^copier$/i }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("Voici le rapport généré."));
+    expect(screen.getByText(/copié dans le presse-papiers/i)).toBeInTheDocument();
   });
 
-  it("triggers a download of the notes as a text file", () => {
+  it("triggers a download of the report as a text file once generated", async () => {
     const createObjectURL = vi.fn().mockReturnValue("blob:fake-url");
     const revokeObjectURL = vi.fn();
     vi.stubGlobal("URL", { ...URL, createObjectURL, revokeObjectURL });
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ report: "Voici le rapport généré." }),
+    } as Response);
 
     render(<Home />);
     fireEvent.change(screen.getByLabelText(/notes de terrain/i), {
       target: { value: "Des notes suffisamment longues pour activer le bouton." },
     });
-    fireEvent.click(screen.getByRole("button", { name: /télécharger les notes/i }));
+    fireEvent.click(screen.getByRole("button", { name: /générer/i }));
+    await waitFor(() => expect(screen.getByText("Voici le rapport généré.")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /télécharger/i }));
 
     expect(createObjectURL).toHaveBeenCalled();
     expect(clickSpy).toHaveBeenCalled();
@@ -84,9 +102,20 @@ describe("Home page", () => {
     clickSpy.mockRestore();
   });
 
-  it("disables copy and download buttons when there are no notes", () => {
+  it("imports a dropped text file into the notes without calling the API", async () => {
     render(<Home />);
-    expect(screen.getByRole("button", { name: /copier les notes/i })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /télécharger les notes/i })).toBeDisabled();
+    const dropZone = screen.getByLabelText(/glissez-déposez/i).closest(".drop-zone") as HTMLElement;
+    const file = new File(["Notes importées depuis un fichier texte."], "notes.txt", {
+      type: "text/plain",
+    });
+
+    fireEvent.drop(dropZone, { dataTransfer: { files: [file] } });
+
+    await waitFor(() =>
+      expect(screen.getByLabelText(/notes de terrain/i)).toHaveValue(
+        "Notes importées depuis un fichier texte."
+      )
+    );
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

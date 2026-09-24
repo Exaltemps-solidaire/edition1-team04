@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isSupportedImageType, transcribeImage, LlmError } from "@/lib/anthropic";
+import { isSupportedFileType, transcribeFile, LlmError } from "@/lib/anthropic";
 
-const MAX_BASE64_LENGTH = 8_000_000; // ~6 Mo d'image d'origine
+const MAX_BASE64_LENGTH = 8_000_000; // ~6 Mo de fichier d'origine
 
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -11,26 +11,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Corps de requête JSON invalide." }, { status: 400 });
   }
 
-  const imageBase64 = (body as { imageBase64?: unknown })?.imageBase64;
+  const fileBase64 = (body as { fileBase64?: unknown })?.fileBase64;
   const mimeType = (body as { mimeType?: unknown })?.mimeType;
 
-  if (typeof imageBase64 !== "string" || imageBase64.length === 0) {
-    return NextResponse.json({ error: 'Le champ "imageBase64" est requis.' }, { status: 400 });
+  if (typeof fileBase64 !== "string" || fileBase64.length === 0) {
+    return NextResponse.json({ error: 'Le champ "fileBase64" est requis.' }, { status: 400 });
   }
 
-  if (imageBase64.length > MAX_BASE64_LENGTH) {
-    return NextResponse.json({ error: "Image trop volumineuse (6 Mo maximum)." }, { status: 400 });
+  if (fileBase64.length > MAX_BASE64_LENGTH) {
+    return NextResponse.json({ error: "Fichier trop volumineux (6 Mo maximum)." }, { status: 400 });
   }
 
-  if (typeof mimeType !== "string" || !isSupportedImageType(mimeType)) {
+  if (typeof mimeType !== "string" || !isSupportedFileType(mimeType)) {
     return NextResponse.json(
-      { error: "Format d'image non supporté (png, jpeg, webp ou gif attendu)." },
+      { error: "Format de fichier non supporté (image png/jpeg/webp/gif ou PDF attendu)." },
       { status: 400 }
     );
   }
 
   try {
-    const result = await transcribeImage(imageBase64, mimeType);
+    const result = await transcribeFile(fileBase64, mimeType);
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
     if (error instanceof LlmError) {
