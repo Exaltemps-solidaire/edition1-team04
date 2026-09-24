@@ -8,7 +8,9 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const canSubmit = notes.trim().length >= 20 && !loading;
+  const MIN_NOTES_LENGTH = 20;
+  const remaining = MIN_NOTES_LENGTH - notes.trim().length;
+  const canSubmit = remaining <= 0 && !loading;
 
   async function handleGenerate() {
     setLoading(true);
@@ -58,6 +60,11 @@ export default function Home() {
         <button onClick={handleGenerate} disabled={!canSubmit}>
           {loading ? "Génération en cours..." : "Générer une première version"}
         </button>
+        {!loading && remaining > 0 && (
+          <span style={{ marginLeft: "0.75rem", color: "#5b6270", fontSize: "0.9rem" }}>
+            Encore {remaining} caractère{remaining > 1 ? "s" : ""} pour activer le bouton
+          </span>
+        )}
       </div>
 
       <p className="disclaimer">
