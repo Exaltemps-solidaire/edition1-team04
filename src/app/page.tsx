@@ -13,8 +13,8 @@ const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 const DOCUMENT_TYPES = ["application/pdf"];
 const TEXT_EXTENSIONS = [".txt", ".md", ".csv"];
 const DRAFT_STORAGE_KEY = "exaltemps-notes-draft";
-const GENERATE_TIMEOUT_MS = 45_000;
-const IMPORT_TIMEOUT_MS = 60_000;
+const GENERATE_TIMEOUT_MS = 120_000;
+const IMPORT_TIMEOUT_MS = 120_000;
 const CHALLENGE_TIMEOUT_MS = 45_000;
 const PLACEHOLDER_TEXT = /\[à compléter par le professionnel[^\]]*\]/gi;
 

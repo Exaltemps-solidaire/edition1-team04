@@ -138,7 +138,7 @@ export async function generateReport(
   const text = await callMessages(
     REPORT_SYSTEM_PROMPT,
     `Voici les notes de terrain :\n\n${notes}`,
-    2000,
+    8192,
     fetchImpl
   );
   return { report: text };
@@ -192,7 +192,7 @@ export async function transcribeFile(
   const text = await callMessages(
     TRANSCRIBE_SYSTEM_PROMPT,
     [fileBlock, { type: "text", text: "Transcris le texte visible sur ce document de notes." }],
-    2000,
+    8192,
     fetchImpl
   );
   return { text };
