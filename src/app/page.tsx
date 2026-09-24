@@ -398,11 +398,13 @@ export default function Home() {
 
   return (
     <main>
-      <h1>Brouillon de rapport</h1>
-      <p className="intro no-print">
-        Collez vos notes de terrain (visites, échanges, observations), ou importez un fichier (photo,
-        PDF, texte). Une première version structurée du rapport sera générée à partir de ce contenu.
-      </p>
+      <header className="page-header no-print">
+        <h1>Brouillon de rapport</h1>
+        <p className="intro">
+          Collez vos notes de terrain (visites, échanges, observations), ou importez un fichier (photo,
+          PDF, texte). Une première version structurée du rapport sera générée à partir de ce contenu.
+        </p>
+      </header>
 
       <section className="card no-print">
         <div className="label-row">
@@ -474,7 +476,7 @@ export default function Home() {
             </button>
           )}
         </div>
-        <p className="disclaimer" style={{ textAlign: "center" }}>
+        <p className="disclaimer disclaimer-center">
           Ce brouillon est généré automatiquement et n&apos;engage aucune validation : il doit être
           relu, corrigé et validé par le professionnel avant tout usage.
         </p>
@@ -486,7 +488,7 @@ export default function Home() {
       </section>
 
       {report && (
-        <section className="card">
+        <section className="card report-card">
           <div className="report-header">
             <h2>Première version</h2>
             <div className="button-row no-print">
@@ -511,7 +513,7 @@ export default function Home() {
             <ReactMarkdown components={markdownComponents}>{report}</ReactMarkdown>
           </div>
 
-          <div className="button-row no-print" style={{ marginTop: "1rem" }}>
+          <div className="button-row no-print section-spaced">
             <button type="button" onClick={handleChallenge} disabled={challenging} aria-busy={challenging}>
               {challenging && <Spinner />}
               {challenging ? "Analyse en cours..." : "Vérifier mes ressentis"}
@@ -534,7 +536,7 @@ export default function Home() {
           )}
 
           {challengeItems && challengeItems.length > 0 && (
-            <div className="no-print" style={{ marginTop: "1rem" }}>
+            <div className="no-print section-spaced">
               <h3>Ressentis à étayer</h3>
               <ul className="challenge-list">
                 {challengeItems.map((item, index) => (
