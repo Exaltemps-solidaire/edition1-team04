@@ -466,7 +466,7 @@ export default function Home() {
             aria-busy={loading}
           >
             {loading && <Spinner />}
-            {loading ? "Génération en cours..." : "Générer une première version"}
+            {loading ? "Génération en cours..." : "Générer un rapport"}
           </button>
           {loading && (
             <button type="button" className="button-cancel" onClick={handleCancelGenerate}>
