@@ -48,4 +48,45 @@ describe("Home page", () => {
 
     await waitFor(() => expect(screen.getByText("Erreur serveur.")).toBeInTheDocument());
   });
+
+  it("copies the notes to the clipboard", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+
+    render(<Home />);
+    fireEvent.change(screen.getByLabelText(/notes de terrain/i), {
+      target: { value: "Des notes suffisamment longues pour activer le bouton." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /copier les notes/i }));
+
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith("Des notes suffisamment longues pour activer le bouton.")
+    );
+    expect(screen.getByText(/copiées dans le presse-papiers/i)).toBeInTheDocument();
+  });
+
+  it("triggers a download of the notes as a text file", () => {
+    const createObjectURL = vi.fn().mockReturnValue("blob:fake-url");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", { ...URL, createObjectURL, revokeObjectURL });
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    render(<Home />);
+    fireEvent.change(screen.getByLabelText(/notes de terrain/i), {
+      target: { value: "Des notes suffisamment longues pour activer le bouton." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /télécharger les notes/i }));
+
+    expect(createObjectURL).toHaveBeenCalled();
+    expect(clickSpy).toHaveBeenCalled();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:fake-url");
+
+    clickSpy.mockRestore();
+  });
+
+  it("disables copy and download buttons when there are no notes", () => {
+    render(<Home />);
+    expect(screen.getByRole("button", { name: /copier les notes/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /télécharger les notes/i })).toBeDisabled();
+  });
 });
