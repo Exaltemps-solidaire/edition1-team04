@@ -1,0 +1,20 @@
+services:
+  frontend:
+    build: .
+    command: ["npx", "next", "start", "-p", "8080"]
+    environment:
+      - ANTHROPIC_BASE_URL
+      - ANTHROPIC_API_KEY
+      - LLM_PROVIDER
+    ports: ["8080:8080"]
+    restart: unless-stopped
+
+  api:
+    build: .
+    command: ["npx", "next", "start", "-p", "8081"]
+    environment:
+      - ANTHROPIC_BASE_URL
+      - ANTHROPIC_API_KEY
+      - LLM_PROVIDER
+    ports: ["8081:8081"]
+    restart: unless-stopped

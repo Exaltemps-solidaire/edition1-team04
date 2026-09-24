@@ -1,0 +1,22 @@
+# Posé par l'infrastructure du hackathon. Ce dépôt est PUBLIC.
+*.env
+.env
+hackathon.env
+*.pem
+*_key
+id_*
+node_modules/
+__pycache__/
+
+# Next.js
+/.next/
+/out/
+/build
+next-env.d.ts
+
+# Test coverage
+/coverage
+
+# Local runtime artifacts
+/.run/
+*.tsbuildinfo
