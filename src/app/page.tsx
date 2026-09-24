@@ -22,14 +22,30 @@ function Spinner({ dark = false }: { dark?: boolean }) {
   return <span className={`spinner${dark ? " spinner-dark" : ""}`} aria-hidden="true" />;
 }
 
-function downloadTextFile(filename: string, content: string) {
-  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+function downloadBlob(filename: string, content: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function downloadTextFile(filename: string, content: string) {
+  downloadBlob(filename, content, "text/plain;charset=utf-8");
+}
+
+function downloadWordFile(filename: string, innerHtml: string) {
+  const html = `<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8"><title>Rapport</title>
+<style>
+  body { font-family: Calibri, Arial, sans-serif; font-size: 12pt; line-height: 1.5; }
+  mark { background: #fff3b0; }
+</style>
+</head>
+<body>${innerHtml}</body></html>`;
+  downloadBlob(filename, "﻿" + html, "application/msword;charset=utf-8");
 }
 
 function readFileAsBase64(file: File): Promise<string> {
@@ -115,6 +131,7 @@ export default function Home() {
   const [challengeError, setChallengeError] = useState<string | null>(null);
 
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const reportOutputRef = useRef<HTMLDivElement>(null);
 
   const generateControllerRef = useRef<AbortController | null>(null);
   const generateCancelReasonRef = useRef<"user" | "timeout" | null>(null);
@@ -343,6 +360,16 @@ export default function Home() {
     downloadTextFile(filename, report);
   }
 
+  function handleDownloadWord() {
+    if (!report || !reportOutputRef.current) return;
+    const filename = `rapport-${new Date().toISOString().slice(0, 10)}.doc`;
+    downloadWordFile(filename, reportOutputRef.current.innerHTML);
+  }
+
+  function handlePrintReport() {
+    window.print();
+  }
+
   async function handleChallenge() {
     if (!report) return;
 
@@ -502,6 +529,16 @@ export default function Home() {
               >
                 Télécharger (.txt)
               </button>
+              <button
+                type="button"
+                className="button-secondary button-small"
+                onClick={handleDownloadWord}
+              >
+                Télécharger (.doc)
+              </button>
+              <button type="button" className="button-secondary button-small" onClick={handlePrintReport}>
+                Imprimer / PDF
+              </button>
             </div>
           </div>
           {copyFeedback && (
@@ -509,7 +546,12 @@ export default function Home() {
               {copyFeedback}
             </p>
           )}
-          <div className="report-output">
+          <p className="field-hint no-print">
+            Le .doc s&apos;ouvre dans Word/LibreOffice pour être corrigé ; « Imprimer » permet
+            d&apos;enregistrer un PDF fidèle à la mise en page via la fenêtre d&apos;impression du
+            navigateur.
+          </p>
+          <div className="report-output" ref={reportOutputRef}>
             <ReactMarkdown components={markdownComponents}>{report}</ReactMarkdown>
           </div>
 

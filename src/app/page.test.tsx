@@ -97,13 +97,63 @@ describe("Home page", () => {
     fireEvent.click(screen.getByRole("button", { name: /générer/i }));
     await waitFor(() => expect(screen.getByText("Voici le rapport généré.")).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole("button", { name: /télécharger/i }));
+    fireEvent.click(screen.getByRole("button", { name: /télécharger \(\.txt\)/i }));
 
     expect(createObjectURL).toHaveBeenCalled();
     expect(clickSpy).toHaveBeenCalled();
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:fake-url");
 
     clickSpy.mockRestore();
+  });
+
+  it("triggers a download of the report as a Word-compatible file once generated", async () => {
+    const createObjectURL = vi.fn().mockReturnValue("blob:fake-url");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", { ...URL, createObjectURL, revokeObjectURL });
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ report: "## Titre\n\nVoici le rapport généré." }),
+    } as Response);
+
+    render(<Home />);
+    fireEvent.change(screen.getByLabelText(/notes de terrain/i), {
+      target: { value: "Des notes suffisamment longues pour activer le bouton." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /générer/i }));
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { level: 2, name: "Titre" })).toBeInTheDocument()
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /\.doc/i }));
+
+    expect(createObjectURL).toHaveBeenCalled();
+    const blobArg = createObjectURL.mock.calls[0][0] as Blob;
+    expect(blobArg.type).toContain("application/msword");
+    expect(clickSpy).toHaveBeenCalled();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:fake-url");
+
+    clickSpy.mockRestore();
+  });
+
+  it("opens the print dialog to export the report as PDF", async () => {
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => {});
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ report: "Voici le rapport généré." }),
+    } as Response);
+
+    render(<Home />);
+    fireEvent.change(screen.getByLabelText(/notes de terrain/i), {
+      target: { value: "Des notes suffisamment longues pour activer le bouton." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /générer/i }));
+    await waitFor(() => expect(screen.getByText("Voici le rapport généré.")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /imprimer/i }));
+
+    expect(printSpy).toHaveBeenCalled();
+    printSpy.mockRestore();
   });
 
   it("imports a dropped text file into the notes without calling the API", async () => {
