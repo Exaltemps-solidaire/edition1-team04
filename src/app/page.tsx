@@ -238,16 +238,17 @@ export default function Home() {
           <label htmlFor="file-import" className="drop-zone-label">
             Glissez-déposez un fichier ici, ou{" "}
             <span className="drop-zone-browse">choisissez-le</span>
+            <input
+              id="file-import"
+              type="file"
+              className="visually-hidden"
+              accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,text/csv,.txt,.md,.csv"
+              onChange={handleFileInputChange}
+              disabled={importing}
+            />
             <br />
             <span className="field-hint">photo, PDF ou fichier texte (.txt, .md, .csv)</span>
           </label>
-          <input
-            id="file-import"
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,text/csv,.txt,.md,.csv"
-            onChange={handleFileInputChange}
-            disabled={importing}
-          />
           {importing && (
             <span className="status-text">
               <Spinner dark /> Import en cours...
