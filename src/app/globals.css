@@ -58,6 +58,28 @@ label {
   margin: 0 0 0.75rem;
 }
 
+.label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.label-row label {
+  margin-bottom: 0;
+}
+
+.char-counter {
+  font-size: 0.8rem;
+  color: #8b93a3;
+  white-space: nowrap;
+}
+
+.char-counter-ok {
+  color: #1f4b8f;
+  font-weight: 600;
+}
+
 textarea {
   width: 100%;
   min-height: 240px;
@@ -183,6 +205,18 @@ button:disabled {
   padding: 0.35rem 0.7rem;
 }
 
+.button-cancel {
+  background: transparent;
+  color: #7a1f14;
+  border: 1px solid #f5c2bc;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.8rem;
+}
+
+.button-cancel:hover:not(:disabled) {
+  background: #fdecea;
+}
+
 .status-text {
   font-size: 0.9rem;
   color: #5b6270;
@@ -214,7 +248,6 @@ button:disabled {
 }
 
 .report-output {
-  white-space: pre-wrap;
   background: #fafbfc;
   border: 1px solid #dfe2e7;
   border-radius: 6px;
@@ -222,6 +255,39 @@ button:disabled {
   margin: 1rem 0 0;
   line-height: 1.5;
   font-size: 0.95rem;
+}
+
+.report-output > *:first-child {
+  margin-top: 0;
+}
+
+.report-output > *:last-child {
+  margin-bottom: 0;
+}
+
+.report-output p,
+.report-output ul,
+.report-output ol {
+  margin: 0 0 0.75rem;
+}
+
+.report-output ul,
+.report-output ol {
+  padding-left: 1.25rem;
+}
+
+.report-output h1,
+.report-output h2,
+.report-output h3 {
+  margin: 1rem 0 0.5rem;
+}
+
+mark.placeholder-todo {
+  background: #fff3b0;
+  color: #6b4e00;
+  padding: 0 0.2em;
+  border-radius: 3px;
+  font-weight: 600;
 }
 
 .error-banner {
@@ -265,4 +331,32 @@ hr.divider {
   border: none;
   border-top: 1px solid #e2e5ea;
   margin: 1.25rem 0;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+  }
+
+  main {
+    max-width: none;
+    padding: 0;
+  }
+
+  .card {
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin-bottom: 0;
+  }
+
+  .report-output {
+    border: none;
+    background: white;
+    padding: 0;
+  }
 }
